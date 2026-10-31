@@ -1,0 +1,82 @@
+import cv2
+from picamera2 import Picamera2
+import serial
+import time
+
+try:
+    ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+    time.sleep(2) 
+except:
+    print("Fail.")
+    ser = None
+
+with open('labels.txt', 'r') as f:
+    CLASSES = [line.strip() for line in f.readlines()]
+
+picam2 = Picamera2()
+config = picam2.create_preview_configuration(main={"format": "RGB888", "size": (640, 480)})
+picam2.configure(config)
+picam2.start()
+
+net = cv2.dnn.readNetFromTensorflow('ssd_mobilenet_v2_coco_2018_03_29/frozen_inference_graph.pb', 
+                                    'ssd_mobilenet_v2_coco_2018_03_29.pbtxt')
+
+last_command = None
+
+try:
+    while True:
+        frame = picam2.capture_array()
+        (h, w) = frame.shape[:2]
+        center_x = w // 2
+        
+        blob = cv2.dnn.blobFromImage(frame, size=(250, 250), swapRB=True, crop=False)
+        net.setInput(blob)
+        detections = net.forward()
+
+        detected_target = False
+        current_command = 's'
+
+        for i in range(detections.shape[2]):
+            confidence = detections[0, 0, i, 2]
+            if confidence > 0.5:
+                idx = int(detections[0, 0, i, 1])
+                
+                if idx < len(CLASSES):
+                    label = CLASSES[idx]
+                    
+                    if label == "person":
+                        box = detections[0, 0, i, 3:7] * [w, h, w, h]
+                        (startX, startY, endX, endY) = box.astype("int")
+                        
+                        obj_center_x = (startX + endX) // 2
+                        detected_target = True
+
+                        cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
+                        cv2.putText(frame, f"TARGET: {label}", (startX, startY - 10), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+                        if obj_center_x < center_x - 60:
+                            current_command = 'l'
+                        elif obj_center_x > center_x + 60:
+                            current_command = 'r'
+                        else:
+                            current_command = 'f'
+                        break 
+
+        if not detected_target:
+            current_command = 's'
+
+        if ser and current_command != last_command:
+            ser.write(current_command.encode())
+            print(f"[SERIAL SEND] -> {current_command}")
+            last_command = current_command
+
+        cv2.imshow("Person Tracking (640x480)", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+finally:
+    if ser:
+        ser.write(b's')
+        ser.close()
+    picam2.stop()
+    cv2.destroyAllWindows()

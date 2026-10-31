@@ -1,0 +1,91 @@
+#define SPEED 225
+
+int IN5 = A4; int IN6 = A5;
+int IN7 = 2;  int IN8 = 4;
+int ENA2 = 6;
+int ENB2 = 9;
+
+int IN9 = A1;  int IN10 = A2;
+int IN11 = 10; int IN12 = 11;
+int ENA3 = 3;
+int ENB3 = 5;
+
+bool stopMotors = false;
+
+void setup() {
+  Serial.begin(9600);
+  int pins[] = {A4, A5, 2, 4, 6, 9, A1, A2, 10, 11, 3, 5};
+  for(int i=0; i<12; i++) pinMode(pins[i], OUTPUT);
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    char input = Serial.read();
+    stopMotors = false;
+
+    if (input == 's') {
+      stopMotors = true;
+    } 
+    else if (input == 'f') { 
+      moveForward();
+    } 
+    else if (input == 'b') { 
+      moveBackward();
+    } 
+    else if (input == 'l') { 
+      turnLeft();
+    } 
+    else if (input == 'r') { 
+      turnRight();
+    }
+  }
+
+  if (stopMotors) {
+    halt();
+  }
+}
+
+void moveForward() {
+  digitalWrite(IN5, HIGH); digitalWrite(IN6, LOW);
+  digitalWrite(IN9, HIGH); digitalWrite(IN10, LOW);
+  digitalWrite(IN7, LOW); digitalWrite(IN8, HIGH);
+  digitalWrite(IN11, LOW); digitalWrite(IN12, HIGH);
+  applySpeed(SPEED);
+}
+
+void moveBackward() {
+  digitalWrite(IN5, LOW); digitalWrite(IN6, HIGH);
+  digitalWrite(IN9, LOW); digitalWrite(IN10, HIGH);
+  digitalWrite(IN7, HIGH); digitalWrite(IN8, LOW);
+  digitalWrite(IN11, HIGH); digitalWrite(IN12, LOW);
+  applySpeed(SPEED);
+}
+
+void turnLeft() {
+  digitalWrite(IN5, HIGH); digitalWrite(IN6, LOW);
+  digitalWrite(IN9, HIGH); digitalWrite(IN10, LOW);
+  digitalWrite(IN7, HIGH); digitalWrite(IN8, LOW);
+  digitalWrite(IN11, HIGH); digitalWrite(IN12, LOW);
+  applySpeed(SPEED);
+}
+
+void turnRight() {
+  digitalWrite(IN5, LOW); digitalWrite(IN6, HIGH);
+  digitalWrite(IN9, LOW); digitalWrite(IN10, HIGH);
+  digitalWrite(IN7, LOW); digitalWrite(IN8, HIGH);
+  digitalWrite(IN11, LOW); digitalWrite(IN12, HIGH);
+  applySpeed(SPEED);
+}
+
+void applySpeed(int s) {
+  analogWrite(ENA2, s); analogWrite(ENB2, s);
+  analogWrite(ENA3, s); analogWrite(ENB3, s);
+}
+
+void halt() {
+  applySpeed(0);
+  digitalWrite(IN5, LOW); digitalWrite(IN6, LOW);
+  digitalWrite(IN7, LOW); digitalWrite(IN8, LOW);
+  digitalWrite(IN9, LOW); digitalWrite(IN10, LOW);
+  digitalWrite(IN11, LOW); digitalWrite(IN12, LOW);
+}
